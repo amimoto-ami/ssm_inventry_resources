@@ -1,6 +1,11 @@
 # AMIMOTO Systems Management documents
 Management AMIMOTO AMI instances by EC2 Systems Manager.
 
+## Prepare
+You need to setup EC2 Systems Manager Agent into your AMIMOTO Instances.
+
+[Documents](http://docs.aws.amazon.com/systems-manager/latest/userguide/ssm-agent.html#sysman-install-ssm-agent)
+
 ## Create documents
 You can create SSM docs by cloudformation.
 ```
@@ -20,7 +25,7 @@ $ aws ssm list-documents --document-filter-list key=Name,value=YOUR_STACK_NAME
             ],
             "DocumentVersion": "1",
             "DocumentType": "Command",
-            "Owner": "213144662080",
+            "Owner": "999999999999",
             "SchemaVersion": "1.2"
         },
         {
@@ -30,7 +35,7 @@ $ aws ssm list-documents --document-filter-list key=Name,value=YOUR_STACK_NAME
             ],
             "DocumentVersion": "1",
             "DocumentType": "Command",
-            "Owner": "213144662080",
+            "Owner": "999999999999",
             "SchemaVersion": "1.2"
         },
         {
@@ -40,7 +45,7 @@ $ aws ssm list-documents --document-filter-list key=Name,value=YOUR_STACK_NAME
             ],
             "DocumentVersion": "1",
             "DocumentType": "Command",
-            "Owner": "213144662080",
+            "Owner": "999999999999",
             "SchemaVersion": "1.2"
         }
     ]
