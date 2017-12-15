@@ -2,7 +2,7 @@
 vhostspath="/var/www/vhosts"
 vhostsused=$(df -m | grep "${vhostspath}" | tr -s ' ' | cut -d ' ' -f3)
 if [ "${vhostsused}" = "" ]; then
-  vhostsused=$(du -sh "${vhostspath}" | awk '{print $1}')
+  vhostsused=$(du -sm "${vhostspath}" | awk '{print $1}')
 else
   vhostsused="${vhostsused}M"
 fi
