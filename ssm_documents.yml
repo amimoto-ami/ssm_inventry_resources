@@ -57,3 +57,21 @@ Resources:
                   - aws ssm put-inventory  --instance-id "${INSTANCEID}"  --items "$(echo ${ITEMS})"  --region "${REGION}"
                 workingDirectory: "/etc/nginx/conf.d/"
                 timeoutSeconds: "300"
+  WordPressDiskUsageAmount:
+    Type: "AWS::SSM::Document"
+    Properties:
+      DocumentType: "Command"
+      Content:
+        schemaVersion: "1.2"
+        description: "Get WordPress disk usage amount"
+        runtimeConfig:
+          aws:runShellScript:
+            properties:
+              - id: 0.aws:runShellScript
+                runCommand:
+                  - REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed -e "s/.$//g")
+                  - INSTANCEID=$(/usr/bin/curl -s http://169.254.169.254/latest/meta-data/instance-id)
+                  - ITEMS=$(curl https://raw.githubusercontent.com/amimoto-ami/ssm_inventry_resources/master/wordpress_disk_usage_amount.sh | bash)
+                  - aws ssm put-inventory  --instance-id "${INSTANCEID}"  --items "$(echo ${ITEMS})"  --region "${REGION}"
+                workingDirectory: "/var/www/vhosts/"
+                timeoutSeconds: "300"
