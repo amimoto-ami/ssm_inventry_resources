@@ -15,8 +15,10 @@ Resources:
             properties:
               - id: 0.aws:runShellScript
                 runCommand:
-                  - REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed -e "s/.$//g")
-                  - INSTANCEID=$(/usr/bin/curl -s http://169.254.169.254/latest/meta-data/instance-id)
+                  - TOKEN=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds:21600") || { echo "ERROR failed to get IMDSv2 token" >&2; exit 1; }
+                  - REGION=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token:${TOKEN}" "http://169.254.169.254/latest/meta-data/placement/region") || { echo "ERROR failed to get region from IMDS" >&2; exit 1; }
+                  - INSTANCEID=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token:${TOKEN}" "http://169.254.169.254/latest/meta-data/instance-id") || { echo "ERROR failed to get instance-id from IMDS" >&2; exit 1; }
+                  - if [ -z "${REGION}" ] || [ -z "${INSTANCEID}" ]; then echo "ERROR REGION or INSTANCEID is empty" >&2; exit 1; fi
                   - ITEMS=$(curl https://raw.githubusercontent.com/amimoto-ami/ssm_inventry_resources/master/packages.sh | bash)
                   - aws ssm put-inventory  --instance-id "${INSTANCEID}"  --items "$(echo ${ITEMS})"  --region "${REGION}"
                 workingDirectory: "/"
@@ -33,8 +35,10 @@ Resources:
             properties:
               - id: 0.aws:runShellScript
                 runCommand:
-                  - REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed -e "s/.$//g")
-                  - INSTANCEID=$(/usr/bin/curl -s http://169.254.169.254/latest/meta-data/instance-id)
+                  - TOKEN=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds:21600") || { echo "ERROR failed to get IMDSv2 token" >&2; exit 1; }
+                  - REGION=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token:${TOKEN}" "http://169.254.169.254/latest/meta-data/placement/region") || { echo "ERROR failed to get region from IMDS" >&2; exit 1; }
+                  - INSTANCEID=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token:${TOKEN}" "http://169.254.169.254/latest/meta-data/instance-id") || { echo "ERROR failed to get instance-id from IMDS" >&2; exit 1; }
+                  - if [ -z "${REGION}" ] || [ -z "${INSTANCEID}" ]; then echo "ERROR REGION or INSTANCEID is empty" >&2; exit 1; fi
                   - ITEMS=$(curl https://raw.githubusercontent.com/amimoto-ami/ssm_inventry_resources/master/wordpress_versions.sh | bash)
                   - aws ssm put-inventory  --instance-id "${INSTANCEID}"  --items "$(echo ${ITEMS})"  --region "${REGION}"
                 workingDirectory: "/var/www/vhosts/"
@@ -51,8 +55,10 @@ Resources:
             properties:
               - id: 0.aws:runShellScript
                 runCommand:
-                  - REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed -e "s/.$//g")
-                  - INSTANCEID=$(/usr/bin/curl -s http://169.254.169.254/latest/meta-data/instance-id)
+                  - TOKEN=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds:21600") || { echo "ERROR failed to get IMDSv2 token" >&2; exit 1; }
+                  - REGION=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token:${TOKEN}" "http://169.254.169.254/latest/meta-data/placement/region") || { echo "ERROR failed to get region from IMDS" >&2; exit 1; }
+                  - INSTANCEID=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token:${TOKEN}" "http://169.254.169.254/latest/meta-data/instance-id") || { echo "ERROR failed to get instance-id from IMDS" >&2; exit 1; }
+                  - if [ -z "${REGION}" ] || [ -z "${INSTANCEID}" ]; then echo "ERROR REGION or INSTANCEID is empty" >&2; exit 1; fi
                   - ITEMS=$(curl https://raw.githubusercontent.com/amimoto-ami/ssm_inventry_resources/master/nginx_ssl_domains.sh | bash)
                   - aws ssm put-inventory  --instance-id "${INSTANCEID}"  --items "$(echo ${ITEMS})"  --region "${REGION}"
                 workingDirectory: "/etc/nginx/conf.d/"
@@ -69,8 +75,10 @@ Resources:
             properties:
               - id: 0.aws:runShellScript
                 runCommand:
-                  - REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed -e "s/.$//g")
-                  - INSTANCEID=$(/usr/bin/curl -s http://169.254.169.254/latest/meta-data/instance-id)
+                  - TOKEN=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds:21600") || { echo "ERROR failed to get IMDSv2 token" >&2; exit 1; }
+                  - REGION=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token:${TOKEN}" "http://169.254.169.254/latest/meta-data/placement/region") || { echo "ERROR failed to get region from IMDS" >&2; exit 1; }
+                  - INSTANCEID=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token:${TOKEN}" "http://169.254.169.254/latest/meta-data/instance-id") || { echo "ERROR failed to get instance-id from IMDS" >&2; exit 1; }
+                  - if [ -z "${REGION}" ] || [ -z "${INSTANCEID}" ]; then echo "ERROR REGION or INSTANCEID is empty" >&2; exit 1; fi
                   - ITEMS=$(curl https://raw.githubusercontent.com/amimoto-ami/ssm_inventry_resources/master/wordpress_disk_usage_amount.sh | bash)
                   - aws ssm put-inventory  --instance-id "${INSTANCEID}"  --items "$(echo ${ITEMS})"  --region "${REGION}"
                 workingDirectory: "/var/www/vhosts/"
