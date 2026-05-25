@@ -68,18 +68,46 @@ Resources:
     Properties:
       DocumentType: "Command"
       Content:
-        schemaVersion: "1.2"
-        description: "Get WordPress disk usage amount"
-        runtimeConfig:
-          aws:runShellScript:
-            properties:
-              - id: 0.aws:runShellScript
-                runCommand:
-                  - TOKEN=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds:21600") || { echo "ERROR failed to get IMDSv2 token" >&2; exit 1; }
-                  - REGION=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token:${TOKEN}" "http://169.254.169.254/latest/meta-data/placement/region") || { echo "ERROR failed to get region from IMDS" >&2; exit 1; }
-                  - INSTANCEID=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token:${TOKEN}" "http://169.254.169.254/latest/meta-data/instance-id") || { echo "ERROR failed to get instance-id from IMDS" >&2; exit 1; }
-                  - if [ -z "${REGION}" ] || [ -z "${INSTANCEID}" ]; then echo "ERROR REGION or INSTANCEID is empty" >&2; exit 1; fi
-                  - ITEMS=$(curl https://raw.githubusercontent.com/amimoto-ami/ssm_inventry_resources/master/wordpress_disk_usage_amount.sh | bash)
-                  - aws ssm put-inventory  --instance-id "${INSTANCEID}"  --items "$(echo ${ITEMS})"  --region "${REGION}"
-                workingDirectory: "/var/www/vhosts/"
-                timeoutSeconds: "300"
+        schemaVersion: "2.2"
+        description: "Get WordPress disk usage amount (overage vs EFS gb tag)"
+        mainSteps:
+          - action: aws:runShellScript
+            name: getWordPressDiskUsage
+            inputs:
+              workingDirectory: "/var/www/vhosts/"
+              timeoutSeconds: "300"
+              runCommand:
+                - |-
+                  set -eu
+                  TOKEN=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds:21600") || { echo "ERROR failed to get IMDSv2 token" >&2; exit 1; }
+                  REGION=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token:${TOKEN}" "http://169.254.169.254/latest/meta-data/placement/region") || { echo "ERROR failed to get region from IMDS" >&2; exit 1; }
+                  INSTANCEID=$(curl -sS --fail --retry 2 --connect-timeout 2 --max-time 5 -H "X-aws-ec2-metadata-token:${TOKEN}" "http://169.254.169.254/latest/meta-data/instance-id") || { echo "ERROR failed to get instance-id from IMDS" >&2; exit 1; }
+                  if [ -z "${REGION}" ] || [ -z "${INSTANCEID}" ]; then echo "ERROR REGION or INSTANCEID is empty" >&2; exit 1; fi
+                  ITEMS=$(curl -sS https://raw.githubusercontent.com/amimoto-ami/ssm_inventry_resources/master/wordpress_disk_usage_amount.sh | bash)
+                  ITEMS_ONELINE=$(echo ${ITEMS})
+                  fallback_put() { echo "WARN ${1:-fallback triggered}, using original ITEMS" >&2; aws ssm put-inventory --instance-id "${INSTANCEID}" --items "${ITEMS_ONELINE}" --region "${REGION}"; exit 0; }
+                  is_int() { case "$1" in ''|*[!0-9]*) return 1;; *) return 0;; esac; }
+                  USED_RAW=$(echo "${ITEMS_ONELINE}" | sed -n -E 's/.*"\/var\/www\/vhosts":"([^"]+)".*/\1/p')
+                  [ -z "${USED_RAW}" ] && fallback_put "failed to parse used size from ITEMS"
+                  USED_MIB=${USED_RAW%M}
+                  is_int "${USED_MIB}" || fallback_put "USED_MIB is not integer: ${USED_MIB}"
+                  FS_ID=$(mount | awk '$3=="/var/www/vhosts" {print $1; exit}' | grep -oE 'fs-[0-9a-f]+' | head -n1 || true)
+                  if [ -z "${FS_ID}" ]; then
+                    FS_ID=$(grep -E '[[:space:]]/var/www/vhosts[[:space:]]' /etc/fstab 2>/dev/null | grep -oE 'fs-[0-9a-f]+' | head -n1 || true)
+                  fi
+                  if [ -z "${FS_ID}" ]; then
+                    ENV_VAL=$(aws ec2 describe-tags --filters "Name=resource-id,Values=${INSTANCEID}" "Name=key,Values=PILOTT-ENV" --region "${REGION}" --query 'Tags[0].Value' --output text 2>/dev/null || true)
+                    if [ -n "${ENV_VAL}" ] && [ "${ENV_VAL}" != "None" ]; then
+                      FS_LIST=$(aws efs describe-file-systems --region "${REGION}" --query 'FileSystems[].FileSystemId' --output text 2>/dev/null || true)
+                      for fs in ${FS_LIST}; do
+                        v=$(aws efs describe-tags --file-system-id "$fs" --region "${REGION}" --query "Tags[?Key=='PILOTT-ENV'].Value | [0]" --output text 2>/dev/null || true)
+                        if [ "$v" = "${ENV_VAL}" ]; then FS_ID="$fs"; break; fi
+                      done
+                    fi
+                  fi
+                  GB=""
+                  if [ -n "${FS_ID}" ]; then GB=$(aws efs describe-tags --file-system-id "${FS_ID}" --region "${REGION}" --query "Tags[?Key=='gb'].Value | [0]" --output text 2>/dev/null || true); fi
+                  if [ -n "${GB}" ] && [ "${GB}" != "None" ] && is_int "${GB}"; then DIFF=$(( USED_MIB - GB * 1024 )); else DIFF=${USED_MIB}; fi
+                  NEW_ITEMS=$(echo "${ITEMS_ONELINE}" | sed -E "s|\"/var/www/vhosts\":\"[^\"]+\"|\"/var/www/vhosts\":\"${DIFF}\"|")
+                  [ -z "${NEW_ITEMS}" ] && fallback_put "failed to build NEW_ITEMS"
+                  aws ssm put-inventory --instance-id "${INSTANCEID}" --items "${NEW_ITEMS}" --region "${REGION}"
