@@ -75,7 +75,7 @@ Resources:
             name: getWordPressDiskUsage
             inputs:
               workingDirectory: "/var/www/vhosts/"
-              timeoutSeconds: "300"
+              timeoutSeconds: "900"
               runCommand:
                 - |-
                   set -eu
@@ -105,9 +105,17 @@ Resources:
                       done
                     fi
                   fi
-                  GB=""
-                  if [ -n "${FS_ID}" ]; then GB=$(aws efs describe-tags --file-system-id "${FS_ID}" --region "${REGION}" --query "Tags[?Key=='gb'].Value | [0]" --output text 2>/dev/null || true); fi
-                  if [ -n "${GB}" ] && [ "${GB}" != "None" ] && is_int "${GB}"; then DIFF=$(( USED_MIB - GB * 1024 )); else DIFF=${USED_MIB}; fi
-                  NEW_ITEMS=$(echo "${ITEMS_ONELINE}" | sed -E "s|\"/var/www/vhosts\":\"[^\"]+\"|\"/var/www/vhosts\":\"${DIFF}\"|")
+                  if [ -z "${FS_ID}" ]; then fallback_put "FS_ID not found"; fi
+                  OFFSET=$(( $(echo "${INSTANCEID}" | cksum | cut -d' ' -f1) % 600 ))
+                  sleep "${OFFSET}"
+                  GB=$(AWS_RETRY_MODE=standard AWS_MAX_ATTEMPTS=8 aws efs describe-tags --file-system-id "${FS_ID}" --region "${REGION}" --query "Tags[?Key=='gb'].Value | [0]" --output text)
+                  if [ -z "${GB}" ] || [ "${GB}" = "None" ]; then
+                    echo "ERROR: EFS ${FS_ID} の gb タグ取得に失敗しました" >&2; exit 1
+                  fi
+                  if ! is_int "${GB}"; then
+                    echo "ERROR: gb タグの値が整数ではありません: ${GB}" >&2; exit 1
+                  fi
+                  DIFF=$(( USED_MIB - GB * 1024 ))
+                  NEW_ITEMS=$(echo "${ITEMS_ONELINE}" | sed -E "s|\"SchemaVersion\":[[:space:]]*\"[^\"]+\"|\"SchemaVersion\":\"1.1\"|" | sed -E "s|\"/var/www/vhosts\":\"[^\"]+\"|\"/var/www/vhosts\":\"${DIFF}\"|")
                   [ -z "${NEW_ITEMS}" ] && fallback_put "failed to build NEW_ITEMS"
                   aws ssm put-inventory --instance-id "${INSTANCEID}" --items "${NEW_ITEMS}" --region "${REGION}"
